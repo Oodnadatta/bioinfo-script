@@ -1,0 +1,26 @@
+#! /bin/sh
+
+#Reference from 1kG
+test -f ~/db/human_g1k_v37.fasta || wget ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/technical/reference/human_g1k_v37.fasta.gz -O - | gunzip > ~/db/human_g1k_v37.fasta
+test -f ~/db/human_g1k_v37.fasta.fai || wget ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/technical/reference/human_g1k_v37.fasta.fai -O ~/db/human_g1k_v37.fasta.fai
+
+#Capture
+test -f ~/db/Agilent/S04380110_Covered.bed || (echo 'ERROR - Capture .bed are missing. To get the capture .bed, download the data from https://earray.chem.agilent.com/suredesign. Just create an account, log in, and select the "Find Designs" tab, then "SureSelect DNA" then under that select "Agilent Catalog", then there should be a list of the different SureSelect related bed files and whatnot.' && exit 1)
+
+#dbSNP
+test -f ~/db/dbSNP/GRCh37p13_dbsnp146_00-All.vcf || wget ftp://ftp.ncbi.nlm.nih.gov/snp/organisms/human_9606_b146_GRCh37p13/VCF/00-All.vcf.gz -O - | gunzip > ~/db/dbSNP/GRCh37p13_dbsnp146_00-All.vcf
+
+#Calling gVCF GATK HaplotypeCaller
+java -Xmx16g -jar GenomeAnalysisTK.jar \
+	-T HaplotypeCaller \
+		-ERC GVCF \
+		--variant_index_type LINEAR \
+		--variant_index_parameter 128000 \
+	-R ~/db/human_g1k_v37.fasta \
+	-stand_call_conf 50.0 \
+	-stand_emit_conf 10.0 \
+	-S SILENT \
+	-L:capture,BED ~/db/Agilent/S04380110_Covered.bed \
+	-I "$1" \
+	--dbsnp:vcfinput,VCF \
+	-o $(echo "$1" | sed 's/.bam$/.vcf/')
