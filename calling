@@ -3,36 +3,103 @@
 #Created by Anne-Sophie Denommé-Pichon
 #2015-12-06
 
-############################ ALIGNMENT ############################
-#To do.
+FASTQ1="$1"
+FASTQ2="$2"
+BAM="$3"
+SAM=$(echo "$BAM" | sed 's/.bam$/.sam/')
+VCF=$(echo "$BAM" | sed 's/.bam$/.vcf/')
+SAMPLE=$(echo "$BAM" | sed 's@\(.*/\)\?\([^/]*\).bam$@\2@')
+
+THREADS=24
+MEMORY=16g
+
+error() { echo "Error at step: $1"; exit 1; }
+
+############################ RESOURCES ############################
 
 #Get reference genome file from 1kG
-test -f ~/db/human_g1k_v37.fasta || wget ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/technical/reference/human_g1k_v37.fasta.gz -O - | gunzip > ~/db/human_g1k_v37.fasta
-test -f ~/db/human_g1k_v37.fasta.fai || wget ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/technical/reference/human_g1k_v37.fasta.fai -O ~/db/human_g1k_v37.fasta.fai
-test -f ~/db/human_g1k_v37.dict || picard-tools CreateSequenceDictionary R= ~/db/human_g1k_v37.fasta O= ~/db/human_g1k_v37.dict
+test -f ~/db/human_g1k_v37.fasta || wget ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/technical/reference/human_g1k_v37.fasta.gz -O - | gunzip > ~/db/human_g1k_v37.fasta || error 'GRCh37 FASTA'
+test -f ~/db/human_g1k_v37.fasta.fai || wget ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/technical/reference/human_g1k_v37.fasta.fai -O ~/db/human_g1k_v37.fasta.fai || error 'GRCh37 FASTA index'
+test -f ~/db/human_g1k_v37.dict || picard-tools CreateSequenceDictionary R= ~/db/human_g1k_v37.fasta O= ~/db/human_g1k_v37.dict || error 'GRCh37 dict'
+test -f ~/db/human_g1k_v37.fasta.bwt || bwa index -a bwtsw ~/db/human_g1k_v37.fasta || error 'GRCh37 BWT'
 
-############################  CALLING  ############################
+#Get indel sites from 1kG
+test -f ~/db/1000G_phase1.indels.hg19.sites.vcf || wget ftp://gsapubftp-anonymous:@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_phase1.indels.hg19.sites.vcf.gz -O - | gunzip > ~/db/1000G_phase1.indels.hg19.sites.vcf || error '1000G indel sites'
 
 #Get capture files
 test -f ~/db/Agilent/S04380110_Covered.bed || (echo 'ERROR - Capture .bed are missing. To get the capture .bed, download the data from https://earray.chem.agilent.com/suredesign. Just create an account, log in, and select the "Find Designs" tab, then "SureSelect DNA" then under that select "Agilent Catalog", then there should be a list of the different SureSelect related bed files and whatnot.' && exit 1)
-test -f ~/db/Agilent/S04380110_Covered_noprefix.bed || grep -v '^(browser|track)' > ~/db/Agilent/S04380110_Covered_noprefix.bed
+test -f ~/db/Agilent/S04380110_Covered_noprefix.bed || grep -v '^(browser|track)' > ~/db/Agilent/S04380110_Covered_noprefix.bed || error 'Agilent covered bed'
 
 #Get dbSNP database
-test -f ~/db/dbSNP/GRCh37p13_dbsnp146_00-All.vcf || wget ftp://ftp.ncbi.nlm.nih.gov/snp/organisms/human_9606_b146_GRCh37p13/VCF/00-All.vcf.gz -O - | gunzip > ~/db/dbSNP/GRCh37p13_dbsnp146_00-All.vcf
+test -f ~/db/dbSNP/GRCh37p13_dbsnp146_00-All.vcf || wget ftp://ftp.ncbi.nlm.nih.gov/snp/organisms/human_9606_b146_GRCh37p13/VCF/00-All.vcf.gz -O - | gunzip > ~/db/dbSNP/GRCh37p13_dbsnp146_00-All.vcf || error 'dbSNP VCF'
+
+############################ ALIGNMENT ############################
+
+# TODO add cutadapt if necessary (cf. FASTQC)
+
+#Align with BWA
+  #-M Mark shorter split hits as secondary (for Picard compatibility)
+  #-R Complete read group header line
+#bwa mem -t $THREADS -M -R "@RG\tID:exome\tSM:${SAMPLE}\tPL:illumina\tLB:agilent_v5" ~/db/human_g1k_v37.fasta "$FASTQ1" "$FASTQ2" > "$SAM" || error 'Alignment'
+
+#samtools view -hb "$SAM" > "$BAM" || error 'SAM to BAM'
+#samtools sort -o -@ $THREADS "$BAM" _ > "$BAM.sorted" && mv "$BAM.sorted" "$BAM" || error 'BAM sort'
+
+#Flag BAM duplicates with Picard
+picard-tools MarkDuplicates REMOVE_DUPLICATES=false METRICS_FILE="$BAM.dup.log" I="$BAM" O="$BAM.duplicates" && mv "$BAM.duplicates" "$BAM" || error 'MarkDuplicates'
+samtools index "$BAM" || error 'BAM index'
+
+#Realign indels
+java -Xmx$MEMORY -jar ~/tools/GATK/GenomeAnalysisTK.jar \
+	-nt $THREADS \
+	-T RealignerTargetCreator \
+		-L ~/db/Agilent/S04380110_Covered_noprefix.bed \
+	-R ~/db/human_g1k_v37.fasta \
+	-known ~/db/1000G_phase1.indels.hg19.sites.vcf \
+	-I "$BAM" \
+	-o "$BAM.targets" || error 'Realignment targets creation'
+
+java -Xmx$MEMORY -jar /opt/GenomeAnalysisTK.jar \
+	-T IndelRealigner \
+	-R ~/db/human_g1k_v37.fasta \
+	-I "$BAM" \
+  	    -known ~/db/1000G_phase1.indels.hg19.sites.vcf \
+	-targetIntervals "$BAM.targets" \
+	-o "$BAM.realigned" && mv "$BAM.realigned" "$BAM" || error 'Indels realignment'
+
+#Recalibrate bases
+java -Xmx$MEMORY -jar /opt/GenomeAnalysisTK.jar \
+	-nct $THREADS \
+	-T BaseRecalibrator \
+  	    -L ~/db/Agilent/S04380110_Covered_noprefix.bed \
+	-R ~/db/human_g1k_v37.fasta \
+	-I "$BAM" \
+	-knownSites ~/db/dbSNP/GRCh37p13_dbsnp146_00-All.vcf \
+	-o "$BAM.bases" || error 'Bases computation for recalibration'
+
+java -Xmx$MEMORY -jar /opt/GenomeAnalysisTK.jar \
+	-nct $THREADS \
+	-T PrintReads \
+	-R ~/db/human_g1k_v37.fasta \
+	-I "$BAM" \
+	-BQSR "$BAM.bases" \
+	-o "$BAM.recalibrated" && mv "$BAM.recalibrated" "$BAM" || error 'Base recalibration'
+
+############################  CALLING  ############################
 
 #Split the Capture .bed  file into 24 files
 #For now, not used in the calling. I have to implement this.
 #nb_line_bed=$(wc -l ~/db/Agilent/S04380110_Covered_noprefix.bed | awk '{print $1}')
-#nb_line_split=$(((nb_line_bed+23)/24))
-#for i in $(seq 24)
+#nb_line_split=$(((nb_line_bed+THREADS-1)/THREADS))
+#for i in $(seq THREADS)
 #	do
 #		test -f ~/db/Agilent/S04380110_Covered_noprefix_$i.bed || \
 #		sed -n "$((nb_line_split*(i-1))),$((nb_line_split*i-1)) p" ~/db/Agilent/S04380110_Covered_noprefix.bed > ~/db/Agilent/S04380110_Covered_noprefix_$i.bed
 #	done
 
 #Call variants with GATK HaplotypeCaller in gVCF
-java -Xmx16g -jar ~/tools/GATK/GenomeAnalysisTK.jar \
-	-nt 24 \
+java -Xmx$MEMORY -jar ~/tools/GATK/GenomeAnalysisTK.jar \
+	-nt $THREADS \
 	-T HaplotypeCaller \
 		-ERC GVCF \
 		--variant_index_type LINEAR \
@@ -42,7 +109,6 @@ java -Xmx16g -jar ~/tools/GATK/GenomeAnalysisTK.jar \
 	-stand_emit_conf 10.0 \
 	-S SILENT \
 	-L:capture,BED ~/db/Agilent/S04380110_Covered_noprefix.bed \
-	-I "$1" \
+	-I "$BAM" \
 	--dbsnp:vcfinput,VCF ~/db/dbSNP/GRCh37p13_dbsnp146_00-All.vcf \
-	-o $(echo "$1" | sed 's/.bam$/.vcf/')
-
+	-o "$VCF"
