@@ -24,11 +24,11 @@ test -f ~/db/human_g1k_v37.dict || picard-tools CreateSequenceDictionary R= ~/db
 test -f ~/db/human_g1k_v37.fasta.bwt || bwa index -a bwtsw ~/db/human_g1k_v37.fasta || error 'GRCh37 BWT'
 
 #Get indel sites from 1kG
-test -f ~/db/1000G_phase1.indels.hg19.sites.vcf || wget ftp://gsapubftp-anonymous:@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_phase1.indels.hg19.sites.vcf.gz -O - | gunzip > ~/db/1000G_phase1.indels.hg19.sites.vcf || error '1000G indel sites'
+test -f ~/db/1000G_phase1.indels.hg19.sites.vcf || wget ftp://gsapubftp-anonymous:@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_phase1.indels.hg19.sites.vcf.gz -O - | gunzip | sed 's/^chr//' > ~/db/1000G_phase1.indels.hg19.sites.vcf || error '1000G indel sites'
 
 #Get capture files
 test -f ~/db/Agilent/S04380110_Covered.bed || (echo 'ERROR - Capture .bed are missing. To get the capture .bed, download the data from https://earray.chem.agilent.com/suredesign. Just create an account, log in, and select the "Find Designs" tab, then "SureSelect DNA" then under that select "Agilent Catalog", then there should be a list of the different SureSelect related bed files and whatnot.' && exit 1)
-test -f ~/db/Agilent/S04380110_Covered_noprefix.bed || grep -v '^(browser|track)' > ~/db/Agilent/S04380110_Covered_noprefix.bed || error 'Agilent covered bed'
+test -f ~/db/Agilent/S04380110_Covered_noprefix.bed || grep -v '^(browser|track)' ~/db/Agilent/S04380110_Covered.bed | sed 's/^chr//' > ~/db/Agilent/S04380110_Covered_noprefix.bed || error 'Agilent covered bed'
 
 #Get dbSNP database
 test -f ~/db/dbSNP/GRCh37p13_dbsnp146_00-All.vcf || wget ftp://ftp.ncbi.nlm.nih.gov/snp/organisms/human_9606_b146_GRCh37p13/VCF/00-All.vcf.gz -O - | gunzip > ~/db/dbSNP/GRCh37p13_dbsnp146_00-All.vcf || error 'dbSNP VCF'
@@ -46,8 +46,8 @@ test -f ~/db/dbSNP/GRCh37p13_dbsnp146_00-All.vcf || wget ftp://ftp.ncbi.nlm.nih.
 #samtools sort -o -@ $THREADS "$BAM" _ > "$BAM.sorted" && mv "$BAM.sorted" "$BAM" || error 'BAM sort'
 
 #Flag BAM duplicates with Picard
-picard-tools MarkDuplicates REMOVE_DUPLICATES=false METRICS_FILE="$BAM.dup.log" I="$BAM" O="$BAM.duplicates" && mv "$BAM.duplicates" "$BAM" || error 'MarkDuplicates'
-samtools index "$BAM" || error 'BAM index'
+#picard-tools MarkDuplicates REMOVE_DUPLICATES=false METRICS_FILE="$BAM.dup.log" I="$BAM" O="$BAM.duplicates" && mv "$BAM.duplicates" "$BAM" || error 'MarkDuplicates'
+#samtools index "$BAM" || error 'BAM index'
 
 #Realign indels
 java -Xmx$MEMORY -jar ~/tools/GATK/GenomeAnalysisTK.jar \
@@ -59,7 +59,7 @@ java -Xmx$MEMORY -jar ~/tools/GATK/GenomeAnalysisTK.jar \
 	-I "$BAM" \
 	-o "$BAM.targets" || error 'Realignment targets creation'
 
-java -Xmx$MEMORY -jar /opt/GenomeAnalysisTK.jar \
+java -Xmx$MEMORY -jar ~/tools/GATK/GenomeAnalysisTK.jar \
 	-T IndelRealigner \
 	-R ~/db/human_g1k_v37.fasta \
 	-I "$BAM" \
@@ -68,7 +68,7 @@ java -Xmx$MEMORY -jar /opt/GenomeAnalysisTK.jar \
 	-o "$BAM.realigned" && mv "$BAM.realigned" "$BAM" || error 'Indels realignment'
 
 #Recalibrate bases
-java -Xmx$MEMORY -jar /opt/GenomeAnalysisTK.jar \
+java -Xmx$MEMORY -jar ~/tools/GATK/GenomeAnalysisTK.jar \
 	-nct $THREADS \
 	-T BaseRecalibrator \
   	    -L ~/db/Agilent/S04380110_Covered_noprefix.bed \
@@ -77,7 +77,7 @@ java -Xmx$MEMORY -jar /opt/GenomeAnalysisTK.jar \
 	-knownSites ~/db/dbSNP/GRCh37p13_dbsnp146_00-All.vcf \
 	-o "$BAM.bases" || error 'Bases computation for recalibration'
 
-java -Xmx$MEMORY -jar /opt/GenomeAnalysisTK.jar \
+java -Xmx$MEMORY -jar ~/tools/GATK/GenomeAnalysisTK.jar \
 	-nct $THREADS \
 	-T PrintReads \
 	-R ~/db/human_g1k_v37.fasta \
