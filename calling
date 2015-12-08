@@ -43,11 +43,11 @@ test -f ~/db/dbSNP/GRCh37p13_dbsnp146_00-All.vcf || wget ftp://ftp.ncbi.nlm.nih.
 #bwa mem -t $THREADS -M -R "@RG\tID:exome\tSM:${SAMPLE}\tPL:illumina\tLB:agilent_v5" ~/db/human_g1k_v37.fasta "$FASTQ1" "$FASTQ2" > "$SAM" || error 'Alignment'
 
 #samtools view -hb "$SAM" > "$BAM" || error 'SAM to BAM'
-#samtools sort -o -@ $THREADS "$BAM" _ > "$BAM.sorted" && mv "$BAM.sorted" "$BAM" || error 'BAM sort'
+#samtools sort -o -@ $THREADS "$BAM" _ > "$BAM.sorted.bam" || error 'BAM sort'
 
 #Flag BAM duplicates with Picard
-#picard-tools MarkDuplicates REMOVE_DUPLICATES=false METRICS_FILE="$BAM.dup.log" I="$BAM" O="$BAM.duplicates" && mv "$BAM.duplicates" "$BAM" || error 'MarkDuplicates'
-#samtools index "$BAM" || error 'BAM index'
+#picard-tools MarkDuplicates REMOVE_DUPLICATES=false METRICS_FILE="$BAM.dup.log" I="$BAM.sorted.bam" O="$BAM.duplicates.bam" || error 'MarkDuplicates'
+#samtools index "$BAM.duplicates.bam" || error 'BAM index'
 
 #Realign indels
 java -Xmx$MEMORY -jar ~/tools/GATK/GenomeAnalysisTK.jar \
@@ -56,16 +56,16 @@ java -Xmx$MEMORY -jar ~/tools/GATK/GenomeAnalysisTK.jar \
 		-L ~/db/Agilent/S04380110_Covered_noprefix.bed \
 	-R ~/db/human_g1k_v37.fasta \
 	-known ~/db/1000G_phase1.indels.hg19.sites.vcf \
-	-I "$BAM" \
-	-o "$BAM.targets" || error 'Realignment targets creation'
+	-I "$BAM.duplicates.bam" \
+ 	-o "$BAM.target.list" || error 'Realignment targets creation'
 
 java -Xmx$MEMORY -jar ~/tools/GATK/GenomeAnalysisTK.jar \
 	-T IndelRealigner \
 	-R ~/db/human_g1k_v37.fasta \
-	-I "$BAM" \
+	-I "$BAM.duplicates.bam" \
   	    -known ~/db/1000G_phase1.indels.hg19.sites.vcf \
-	-targetIntervals "$BAM.targets" \
-	-o "$BAM.realigned" && mv "$BAM.realigned" "$BAM" || error 'Indels realignment'
+	-targetIntervals "$BAM.target.list" \
+	-o "$BAM.realigned.bam" || error 'Indels realignment'
 
 #Recalibrate bases
 java -Xmx$MEMORY -jar ~/tools/GATK/GenomeAnalysisTK.jar \
@@ -73,7 +73,7 @@ java -Xmx$MEMORY -jar ~/tools/GATK/GenomeAnalysisTK.jar \
 	-T BaseRecalibrator \
   	    -L ~/db/Agilent/S04380110_Covered_noprefix.bed \
 	-R ~/db/human_g1k_v37.fasta \
-	-I "$BAM" \
+	-I "$BAM.realigned.bam" \
 	-knownSites ~/db/dbSNP/GRCh37p13_dbsnp146_00-All.vcf \
 	-o "$BAM.bases" || error 'Bases computation for recalibration'
 
@@ -81,9 +81,9 @@ java -Xmx$MEMORY -jar ~/tools/GATK/GenomeAnalysisTK.jar \
 	-nct $THREADS \
 	-T PrintReads \
 	-R ~/db/human_g1k_v37.fasta \
-	-I "$BAM" \
+	-I "$BAM.realigned.bam" \
 	-BQSR "$BAM.bases" \
-	-o "$BAM.recalibrated" && mv "$BAM.recalibrated" "$BAM" || error 'Base recalibration'
+	-o "$BAM.recalibrated.bam" || error 'Base recalibration'
 
 ############################  CALLING  ############################
 
@@ -109,6 +109,6 @@ java -Xmx$MEMORY -jar ~/tools/GATK/GenomeAnalysisTK.jar \
 	-stand_emit_conf 10.0 \
 	-S SILENT \
 	-L:capture,BED ~/db/Agilent/S04380110_Covered_noprefix.bed \
-	-I "$BAM" \
+	-I "$BAM.recalibrated.bam" \
 	--dbsnp:vcfinput,VCF ~/db/dbSNP/GRCh37p13_dbsnp146_00-All.vcf \
 	-o "$VCF"
