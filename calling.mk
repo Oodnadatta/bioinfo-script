@@ -21,6 +21,8 @@ SAMPLE = $(shell echo "$(BAM)" | sed 's@\(.*/\)\?\([^/]*\).bam$$@\2@')
 
 GATK = java -Xmx$(MEMORY) -jar ~/tools/GATK/GenomeAnalysisTK.jar
 
+all: $(VCF).filtered.vcf
+
 ############################ RESOURCES ############################
 
 #Get reference genome file from 1kG
@@ -102,26 +104,26 @@ GATK = java -Xmx$(MEMORY) -jar ~/tools/GATK/GenomeAnalysisTK.jar
 #Align with BWA
   #-M Mark shorter split hits as secondary (for Picard compatibility)
   #-R Complete read group header line
-"$(SAM)": ~/db/human_g1k_v37.fasta "$(FASTQ1)" "$(FASTQ2)"
+$(SAM): ~/db/human_g1k_v37.fasta $(FASTQ1) $(FASTQ2)
 	bwa mem -t $(THREADS) -M -R "@RG\tID:exome\tSM:$(SAMPLE)\tPL:illumina\tLB:agilent_v5" $^ > $@
 
-"$(BAM)": "$(SAM)"
+$(BAM): $(SAM)
 	samtools view -hb $< > $@
 
-"$(BAM).sorted.bam": "$(BAM)"
+$(BAM).sorted.bam: $(BAM)
 	samtools sort -o -@ $(THREADS) $< _ > $@
 
 #Flag BAM duplicates with Picard
-"$(BAM).duplicates.bam": "$(BAM).sorted.bam"
+$(BAM).duplicates.bam: $(BAM).sorted.bam
 	picard-tools MarkDuplicates REMOVE_DUPLICATES=false METRICS_FILE="$(BAM).dup.log" I=$< O=$@
-"$(BAM).dup.log": "$(BAM).duplicates.bam"
+$(BAM).dup.log: $(BAM).duplicates.bam
 	touch $@
 
-"$(BAM).duplicates.bai": "$(BAM).duplicates.bam"
+$(BAM).duplicates.bai: $(BAM).duplicates.bam
 	samtools index $<
 
 #Realign indels
-"$(BAM).target.list": "$(BAM).duplicates.bam" ~/db/Agilent/S04380110_Covered_noprefix.bed ~/db/human_g1k_v37.fasta ~/db/1000G_phase1.indels.b37.vcf
+$(BAM).target.list: $(BAM).duplicates.bam ~/db/Agilent/S04380110_Covered_noprefix.bed ~/db/human_g1k_v37.fasta ~/db/1000G_phase1.indels.b37.vcf
 	$(GATK) \
 		-nt $(THREADS) \
 		-T RealignerTargetCreator \
@@ -131,17 +133,17 @@ GATK = java -Xmx$(MEMORY) -jar ~/tools/GATK/GenomeAnalysisTK.jar
 		-I $< \
 		-o $@
 
-"$(BAM).realigned.bam": "$(BAM).duplicates.bam" "$(BAM).target.list" ~/db/human_g1k_v37.fasta ~/db/1000G_phase1.indels.b37.vcf
+$(BAM).realigned.bam: $(BAM).duplicates.bam $(BAM).target.list ~/db/human_g1k_v37.fasta ~/db/1000G_phase1.indels.b37.vcf
 	$(GATK) \
 		-T IndelRealigner \
 		-R ~/db/human_g1k_v37.fasta \
 		-I $< \
 			-known ~/db/1000G_phase1.indels.b37.vcf \
-		-targetIntervals "$(BAM).target.list" \
+		-targetIntervals $(BAM).target.list \
 		-o $@
 
 #Recalibrate bases
-"$(BAM).bases": "$(BAM).realigned.bam" ~/db/Agilent/S04380110_Covered_noprefix.bed ~/db/human_g1k_v37.fasta ~/db/dbSNP/GRCh37p13_dbsnp146_00-All.vcf
+$(BAM).bases: $(BAM).realigned.bam ~/db/Agilent/S04380110_Covered_noprefix.bed ~/db/human_g1k_v37.fasta ~/db/dbSNP/GRCh37p13_dbsnp146_00-All.vcf
 	$(GATK) \
 		-nct $(THREADS) \
 		-T BaseRecalibrator \
@@ -151,7 +153,7 @@ GATK = java -Xmx$(MEMORY) -jar ~/tools/GATK/GenomeAnalysisTK.jar
 		-knownSites ~/db/dbSNP/GRCh37p13_dbsnp146_00-All.vcf \
 		-o $@
 
-"$(BAM).recalibrated.bam": "$(BAM).realigned.bam" "$(BAM).bases" ~/db/human_g1k_v37.fasta
+$(BAM).recalibrated.bam: $(BAM).realigned.bam $(BAM).bases ~/db/human_g1k_v37.fasta
 	$(GATK) \
 		-nct $(THREADS) \
 		-T PrintReads \
@@ -173,7 +175,7 @@ GATK = java -Xmx$(MEMORY) -jar ~/tools/GATK/GenomeAnalysisTK.jar
 #	done
 
 #Call variants with GATK HaplotypeCaller in gVCF
-"$(GVCF)": "$(BAM).recalibrated.bam" ~/db/Agilent/S04380110_Covered_noprefix.bed ~/db/human_g1k_v37.fasta ~/db/dbSNP/GRCh37p13_dbsnp146_00-All.vcf
+$(GVCF): $(BAM).recalibrated.bam ~/db/Agilent/S04380110_Covered_noprefix.bed ~/db/human_g1k_v37.fasta ~/db/dbSNP/GRCh37p13_dbsnp146_00-All.vcf
 	$(GATK) \
 		-nct $(THREADS) \
 		-T HaplotypeCaller \
@@ -190,7 +192,7 @@ GATK = java -Xmx$(MEMORY) -jar ~/tools/GATK/GenomeAnalysisTK.jar
 		-o $@
 
 # Generate VCF from gVCF
-"$(VCF)": "$(GVCF)" ~/db/Agilent/S04380110_Covered_noprefix.bed ~/db/human_g1k_v37.fasta
+$(VCF): $(GVCF) ~/db/Agilent/S04380110_Covered_noprefix.bed ~/db/human_g1k_v37.fasta
 	$(GATK) \
 		-nt $(THREADS) \
 		-T GenotypeGVCFs \
@@ -200,7 +202,7 @@ GATK = java -Xmx$(MEMORY) -jar ~/tools/GATK/GenomeAnalysisTK.jar
 		-o $@
 
 # Compute VQSR model for SNPs
-"$(VCF).SNP.recal": "$(VCF)" ~/db/human_g1k_v37.fasta ~/db/hapmap_3.3.b37.vcf ~/db/1000G_omni2.5.b37.vcf ~/db/1000G_phase1.snps.high_confidence.b37.vcf.idx ~/db/dbsnp_138.b37.vcf
+$(VCF).SNP.recal: $(VCF) ~/db/human_g1k_v37.fasta ~/db/hapmap_3.3.b37.vcf ~/db/1000G_omni2.5.b37.vcf ~/db/1000G_phase1.snps.high_confidence.b37.vcf.idx ~/db/dbsnp_138.b37.vcf
 	$(GATK) \
 		-nt $(THREADS) \
 		-T VariantRecalibrator \
@@ -209,7 +211,7 @@ GATK = java -Xmx$(MEMORY) -jar ~/tools/GATK/GenomeAnalysisTK.jar
 		-input $< \
 		-resource:hapmap,known=false,training=true,truth=true,prior=15.0 ~/db/hapmap_3.3.b37.vcf \
 		-resource:omni,known=false,training=true,truth=true,prior=12.0 ~/db/1000G_omni2.5.b37.vcf \
-		-resource:1000G,known=false,training=true,truth=false,prior=10.0 ~/db/1000G_phase1.snps.high_confidence.b37.vcf.idx \
+		-resource:1000G,known=false,training=true,truth=false,prior=10.0 ~/db/1000G_phase1.snps.high_confidence.b37.vcf \
 		-resource:dbsnp,known=true,training=false,truth=false,prior=2.0 ~/db/dbsnp_138.b37.vcf \
 			-an FS \
 			-an MQ \
@@ -219,13 +221,13 @@ GATK = java -Xmx$(MEMORY) -jar ~/tools/GATK/GenomeAnalysisTK.jar
 			-an SOR \
 		-recalFile $@ \
 		-tranchesFile "$(VCF).SNP.tranches"
-"$(VCF).SNP.tranches": "$(VCF).SNP.recal"
+$(VCF).SNP.tranches: $(VCF).SNP.recal
 	touch $@
 
 # TODO FIXME if nbSamples > 10 and unrelated, add -an InbreedingCoeff
 
 # Apply VQSR model for SNPs
-"$(VCF).snp_recalibrated.vcf": "$(VCF)" "$(VCF).SNP.recal" "$(VCF).SNP.tranches" ~/db/human_g1k_v37.fasta
+$(VCF).snp_recalibrated.vcf: $(VCF) $(VCF).SNP.recal $(VCF).SNP.tranches ~/db/human_g1k_v37.fasta
 	$(GATK) \
 		-T ApplyRecalibration \
 		-mode SNP \
@@ -237,7 +239,7 @@ GATK = java -Xmx$(MEMORY) -jar ~/tools/GATK/GenomeAnalysisTK.jar
 		-o $@
 
 # Compute VQSR model for indels
-"$(VCF).indels.recal": "$(VCF)" ~/db/human_g1k_v37.fasta ~/db/Mills_and_1000G_gold_standard.indels.b37.vcf ~/db/dbsnp_138.b37.vcf
+$(VCF).indels.recal: $(VCF) ~/db/human_g1k_v37.fasta ~/db/Mills_and_1000G_gold_standard.indels.b37.vcf ~/db/dbsnp_138.b37.vcf
 	$(GATK) \
 		-nt $(THREADS) \
 		-T VariantRecalibrator \
@@ -254,11 +256,11 @@ GATK = java -Xmx$(MEMORY) -jar ~/tools/GATK/GenomeAnalysisTK.jar
 		--maxGaussians 4 \
 		-recalFile $@ \
 		-tranchesFile "$(VCF).indels.tranches"
-"$(VCF).indels.tranches": "$(VCF).indels.recal"
+$(VCF).indels.tranches: $(VCF).indels.recal
 	touch $@
 
 # Apply VQSR model for SNPs
-"$(VCF).all_recalibrated.vcf": "$(VCF).snp_recalibrated.vcf" "$(VCF).indels.recal" "$(VCF).indels.tranches" ~/db/human_g1k_v37.fasta
+$(VCF).all_recalibrated.vcf: $(VCF).snp_recalibrated.vcf $(VCF).indels.recal $(VCF).indels.tranches ~/db/human_g1k_v37.fasta
 	$(GATK) \
 		-T ApplyRecalibration \
 		-mode INDEL \
@@ -270,7 +272,7 @@ GATK = java -Xmx$(MEMORY) -jar ~/tools/GATK/GenomeAnalysisTK.jar
 		-o $@
 
 # Filter variants on VQSR results
-"$(VCF).filtered.vcf": "$(VCF).all_recalibrated.vcf" ~/db/human_g1k_v37.fasta
+$(VCF).filtered.vcf: $(VCF).all_recalibrated.vcf ~/db/human_g1k_v37.fasta
 	$(GATK) \
 		-nt $(THREADS) \
 		-T SelectVariants \

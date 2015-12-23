@@ -147,7 +147,7 @@ java -Xmx$MEMORY -jar ~/tools/GATK/GenomeAnalysisTK.jar \
 	-input "$VCF" \
 	-resource:hapmap,known=false,training=true,truth=true,prior=15.0 ~/db/hapmap_3.3.b37.vcf \
 	-resource:omni,known=false,training=true,truth=true,prior=12.0 ~/db/1000G_omni2.5.b37.vcf \
-	-resource:1000G,known=false,training=true,truth=false,prior=10.0 ~/db/1000G_phase1.snps.high_confidence.b37.vcf.idx \
+	-resource:1000G,known=false,training=true,truth=false,prior=10.0 ~/db/1000G_phase1.snps.high_confidence.b37.vcf \
 	-resource:dbsnp,known=true,training=false,truth=false,prior=2.0 ~/db/dbsnp_138.b37.vcf \
 		-an FS \
 		-an MQ \
