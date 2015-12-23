@@ -1,29 +1,23 @@
 #Created by Anne-Sophie Denommé-Pichon
 #2015-12-22
 
-# Usage:
-# make -f calling.mk FASTQ1=R1.fastq FASTQ2=R2.fastq BAM=file.bam [THREADS=nbThreads] [MEMORY=memoryToUse]
-
-# TODO: use variables instead of full paths with version numbers
-
 FASTQ1 =
 FASTQ2 =
-BAM =
 
 THREADS = 24
 MEMORY = 16g
 
-# TODO FIXME use gmake subst instead of shell / sed
-SAM = $(shell echo "$(BAM)" | sed 's/.bam$$/.sam/')
-GVCF = $(shell echo "$(BAM)" | sed 's/.bam$$/.gvcf/')
-VCF = $(shell echo "$(BAM)" | sed 's/.bam$$/.vcf/')
-SAMPLE = $(shell echo "$(BAM)" | sed 's@\(.*/\)\?\([^/]*\).bam$$@\2@')
-
 GATK = java -Xmx$(MEMORY) -jar ~/tools/GATK/GenomeAnalysisTK.jar
 
-all: $(VCF).filtered.vcf
+.SECONDARY:
+.PHONY: all
+
+all:
+	$(info Usage: make -f calling.mk FASTQ1=R1.fastq FASTQ2=R2.fastq output.vcf [THREADS=nbThreads] [MEMORY=memoryToUse])
 
 ############################ RESOURCES ############################
+
+# TODO: use variables instead of full paths with version numbers
 
 #Get reference genome file from 1kG
 ~/db/human_g1k_v37.fasta:
@@ -104,26 +98,26 @@ all: $(VCF).filtered.vcf
 #Align with BWA
   #-M Mark shorter split hits as secondary (for Picard compatibility)
   #-R Complete read group header line
-$(SAM): ~/db/human_g1k_v37.fasta $(FASTQ1) $(FASTQ2)
-	bwa mem -t $(THREADS) -M -R "@RG\tID:exome\tSM:$(SAMPLE)\tPL:illumina\tLB:agilent_v5" $^ > $@
+%.raw.sam: ~/db/human_g1k_v37.fasta $(FASTQ1) $(FASTQ2)
+	bwa mem -t $(THREADS) -M -R "@RG\tID:exome\tSM:$(basename $(notdir $@))\tPL:illumina\tLB:agilent_v5" $^ > $@
 
-$(BAM): $(SAM)
+%.raw.bam: %.raw.sam
 	samtools view -hb $< > $@
 
-$(BAM).sorted.bam: $(BAM)
+%.sorted.bam: %.raw.bam
 	samtools sort -o -@ $(THREADS) $< _ > $@
 
 #Flag BAM duplicates with Picard
-$(BAM).duplicates.bam: $(BAM).sorted.bam
-	picard-tools MarkDuplicates REMOVE_DUPLICATES=false METRICS_FILE="$(BAM).dup.log" I=$< O=$@
-$(BAM).dup.log: $(BAM).duplicates.bam
+%.duplicates.bam: %.sorted.bam
+	picard-tools MarkDuplicates REMOVE_DUPLICATES=false METRICS_FILE="$*.dup.log" I=$< O=$@
+%.dup.log: %.duplicates.bam
 	touch $@
 
-$(BAM).duplicates.bai: $(BAM).duplicates.bam
+%.duplicates.bai: %.duplicates.bam
 	samtools index $<
 
 #Realign indels
-$(BAM).target.list: $(BAM).duplicates.bam ~/db/Agilent/S04380110_Covered_noprefix.bed ~/db/human_g1k_v37.fasta ~/db/1000G_phase1.indels.b37.vcf
+%.target.list: %.duplicates.bam %.duplicates.bai ~/db/Agilent/S04380110_Covered_noprefix.bed ~/db/human_g1k_v37.fasta ~/db/1000G_phase1.indels.b37.vcf
 	$(GATK) \
 		-nt $(THREADS) \
 		-T RealignerTargetCreator \
@@ -133,17 +127,17 @@ $(BAM).target.list: $(BAM).duplicates.bam ~/db/Agilent/S04380110_Covered_noprefi
 		-I $< \
 		-o $@
 
-$(BAM).realigned.bam: $(BAM).duplicates.bam $(BAM).target.list ~/db/human_g1k_v37.fasta ~/db/1000G_phase1.indels.b37.vcf
+%.realigned.bam: %.duplicates.bam %.target.list ~/db/human_g1k_v37.fasta ~/db/1000G_phase1.indels.b37.vcf
 	$(GATK) \
 		-T IndelRealigner \
 		-R ~/db/human_g1k_v37.fasta \
 		-I $< \
 			-known ~/db/1000G_phase1.indels.b37.vcf \
-		-targetIntervals $(BAM).target.list \
+		-targetIntervals $*.target.list \
 		-o $@
 
 #Recalibrate bases
-$(BAM).bases: $(BAM).realigned.bam ~/db/Agilent/S04380110_Covered_noprefix.bed ~/db/human_g1k_v37.fasta ~/db/dbSNP/GRCh37p13_dbsnp146_00-All.vcf
+%.bases: %.realigned.bam ~/db/Agilent/S04380110_Covered_noprefix.bed ~/db/human_g1k_v37.fasta ~/db/dbSNP/GRCh37p13_dbsnp146_00-All.vcf
 	$(GATK) \
 		-nct $(THREADS) \
 		-T BaseRecalibrator \
@@ -153,13 +147,13 @@ $(BAM).bases: $(BAM).realigned.bam ~/db/Agilent/S04380110_Covered_noprefix.bed ~
 		-knownSites ~/db/dbSNP/GRCh37p13_dbsnp146_00-All.vcf \
 		-o $@
 
-$(BAM).recalibrated.bam: $(BAM).realigned.bam $(BAM).bases ~/db/human_g1k_v37.fasta
+%.recalibrated.bam: %.realigned.bam %.bases ~/db/human_g1k_v37.fasta
 	$(GATK) \
 		-nct $(THREADS) \
 		-T PrintReads \
 		-R ~/db/human_g1k_v37.fasta \
 		-I $< \
-		-BQSR "$(BAM).bases" \
+		-BQSR "$*.bases" \
 		-o $@
 
 ############################  CALLING  ############################
@@ -175,7 +169,7 @@ $(BAM).recalibrated.bam: $(BAM).realigned.bam $(BAM).bases ~/db/human_g1k_v37.fa
 #	done
 
 #Call variants with GATK HaplotypeCaller in gVCF
-$(GVCF): $(BAM).recalibrated.bam ~/db/Agilent/S04380110_Covered_noprefix.bed ~/db/human_g1k_v37.fasta ~/db/dbSNP/GRCh37p13_dbsnp146_00-All.vcf
+%.raw.gvcf: %.recalibrated.bam ~/db/Agilent/S04380110_Covered_noprefix.bed ~/db/human_g1k_v37.fasta ~/db/dbSNP/GRCh37p13_dbsnp146_00-All.vcf
 	$(GATK) \
 		-nct $(THREADS) \
 		-T HaplotypeCaller \
@@ -192,7 +186,7 @@ $(GVCF): $(BAM).recalibrated.bam ~/db/Agilent/S04380110_Covered_noprefix.bed ~/d
 		-o $@
 
 # Generate VCF from gVCF
-$(VCF): $(GVCF) ~/db/Agilent/S04380110_Covered_noprefix.bed ~/db/human_g1k_v37.fasta
+%.raw.vcf: %.raw.gvcf ~/db/Agilent/S04380110_Covered_noprefix.bed ~/db/human_g1k_v37.fasta
 	$(GATK) \
 		-nt $(THREADS) \
 		-T GenotypeGVCFs \
@@ -202,7 +196,7 @@ $(VCF): $(GVCF) ~/db/Agilent/S04380110_Covered_noprefix.bed ~/db/human_g1k_v37.f
 		-o $@
 
 # Compute VQSR model for SNPs
-$(VCF).SNP.recal: $(VCF) ~/db/human_g1k_v37.fasta ~/db/hapmap_3.3.b37.vcf ~/db/1000G_omni2.5.b37.vcf ~/db/1000G_phase1.snps.high_confidence.b37.vcf.idx ~/db/dbsnp_138.b37.vcf
+%.raw.vcf.SNP.recal: %.raw.vcf ~/db/human_g1k_v37.fasta ~/db/hapmap_3.3.b37.vcf ~/db/1000G_omni2.5.b37.vcf ~/db/1000G_phase1.snps.high_confidence.b37.vcf.idx ~/db/dbsnp_138.b37.vcf
 	$(GATK) \
 		-nt $(THREADS) \
 		-T VariantRecalibrator \
@@ -220,26 +214,26 @@ $(VCF).SNP.recal: $(VCF) ~/db/human_g1k_v37.fasta ~/db/hapmap_3.3.b37.vcf ~/db/1
 			-an ReadPosRankSum \
 			-an SOR \
 		-recalFile $@ \
-		-tranchesFile "$(VCF).SNP.tranches"
-$(VCF).SNP.tranches: $(VCF).SNP.recal
+		-tranchesFile "$*.raw.vcf.SNP.tranches"
+%.raw.vcf.SNP.tranches: %.raw.vcf.SNP.recal
 	touch $@
 
 # TODO FIXME if nbSamples > 10 and unrelated, add -an InbreedingCoeff
 
 # Apply VQSR model for SNPs
-$(VCF).snp_recalibrated.vcf: $(VCF) $(VCF).SNP.recal $(VCF).SNP.tranches ~/db/human_g1k_v37.fasta
+%.snp_recalibrated.vcf: %.raw.vcf %.raw.vcf.SNP.recal %.raw.vcf.SNP.tranches ~/db/human_g1k_v37.fasta
 	$(GATK) \
 		-T ApplyRecalibration \
 		-mode SNP \
 		-R ~/db/human_g1k_v37.fasta \
 		-input $< \
 		--ts_filter_level 99.5 \
-		-recalFile "$(VCF).SNP.recal" \
-		-tranchesFile "$(VCF).SNP.tranches" \
+		-recalFile "$*.raw.vcf.SNP.recal" \
+		-tranchesFile "$*.raw.vcf.SNP.tranches" \
 		-o $@
 
 # Compute VQSR model for indels
-$(VCF).indels.recal: $(VCF) ~/db/human_g1k_v37.fasta ~/db/Mills_and_1000G_gold_standard.indels.b37.vcf ~/db/dbsnp_138.b37.vcf
+%.raw.vcf.indels.recal: %.raw.vcf ~/db/human_g1k_v37.fasta ~/db/Mills_and_1000G_gold_standard.indels.b37.vcf ~/db/dbsnp_138.b37.vcf
 	$(GATK) \
 		-nt $(THREADS) \
 		-T VariantRecalibrator \
@@ -255,24 +249,24 @@ $(VCF).indels.recal: $(VCF) ~/db/human_g1k_v37.fasta ~/db/Mills_and_1000G_gold_s
 			-an SOR \
 		--maxGaussians 4 \
 		-recalFile $@ \
-		-tranchesFile "$(VCF).indels.tranches"
-$(VCF).indels.tranches: $(VCF).indels.recal
+		-tranchesFile "$*.raw.vcf.indels.tranches"
+%.raw.vcf.indels.tranches: %.raw.vcf.indels.recal
 	touch $@
 
 # Apply VQSR model for SNPs
-$(VCF).all_recalibrated.vcf: $(VCF).snp_recalibrated.vcf $(VCF).indels.recal $(VCF).indels.tranches ~/db/human_g1k_v37.fasta
+%.all_recalibrated.vcf: %.snp_recalibrated.vcf %.raw.vcf.indels.recal %.raw.vcf.indels.tranches ~/db/human_g1k_v37.fasta
 	$(GATK) \
 		-T ApplyRecalibration \
 		-mode INDEL \
 		-R ~/db/human_g1k_v37.fasta \
 		-input $< \
 		--ts_filter_level 99.0 \
-		-recalFile "$(VCF).indels.recal" \
-		-tranchesFile "$(VCF).indels.tranches" \
+		-recalFile "$*.vcf.indels.recal" \
+		-tranchesFile "$*.vcf.indels.tranches" \
 		-o $@
 
 # Filter variants on VQSR results
-$(VCF).filtered.vcf: $(VCF).all_recalibrated.vcf ~/db/human_g1k_v37.fasta
+%.vcf: %.all_recalibrated.vcf ~/db/human_g1k_v37.fasta
 	$(GATK) \
 		-nt $(THREADS) \
 		-T SelectVariants \
