@@ -134,6 +134,7 @@ all:
 		-I $< \
 			-known ~/db/1000G_phase1.indels.b37.vcf \
 		-targetIntervals $*.target.list \
+		-filterMBQ \
 		-o $@
 
 #Recalibrate bases
