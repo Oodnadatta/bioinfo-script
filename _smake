@@ -1,0 +1,43 @@
+#compdef smake
+
+local curcontext="$curcontext" state line
+typeset -A opt_args
+local subcmds
+
+subcmds=(scan list regenerate)
+
+if [[ $service == "smake" ]]; then
+    _arguments -C -A  "-*" \
+    '--help[show help for this command and exit]' \
+    '*::command:->subcmd' && return 0
+
+    if (( CURRENT == 1 )); then
+        _wanted commands expl 'smake command' compadd -a subcmds
+        return
+    fi
+    service="$words[1]"
+    curcontext="${curcontext%:*}=$service:"
+fi
+
+case $service in
+    (scan)
+        _arguments \
+	    '--full[Perform a full scan, ignoring existing Makefile]' \
+	    '--update[Perform a partial scan, updating existing Makefile]' \
+	    '--ask[Ask whether to perform a full scan or an update (default)]' \
+	    '1:directory:_path_files -/' \
+	    '::makefile:_files'
+    ;;
+
+    (list)
+	_files
+    ;;
+
+    (regenerate)
+	_files
+    ;;
+
+    (*)
+        _message "unknown smake command completion: $service"
+    ;;
+esac
