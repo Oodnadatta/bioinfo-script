@@ -1,0 +1,37 @@
+#compdef vcfsetop
+
+local curcontext="$curcontext" state line
+typeset -A opt_args
+local subcmds
+
+subcmds=(filter list)
+
+if [[ $service == "vcfsetop" ]]; then
+    _arguments -C -A  "-*" \
+    '--help[show help for this command and exit]' \
+    '*::command:->subcmd' && return 0
+
+    if (( CURRENT == 1 )); then
+        _wanted commands expl 'vcfsetop command' compadd -a subcmds
+        return
+    fi
+    service="$words[1]"
+    curcontext="${curcontext%:*}=$service:"
+fi
+
+case $service in
+    (filter)
+        _arguments \
+	    '--exclude[Drop variants from this index]' \
+	    '--include[Keep variants from this index]' \
+	    '--require[Keep variants from this index only]' \
+	    '::vcf:_files'
+    ;;
+
+    (list)
+    ;;
+
+    (*)
+        _message "unknown vcfsetop command completion: $service"
+    ;;
+esac
