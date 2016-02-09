@@ -1,0 +1,4 @@
+#! /bin/sh
+
+unset PYTHONPATH # workaround for systems with both python2 and python3
+python3 "$(dirname $0)/$(basename $0).py" "$@"
