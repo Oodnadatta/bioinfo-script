@@ -65,12 +65,12 @@ Example:
 $ smake.py list Makefile
 ```
 ### Depedencies
-smake.py: main program
-smake: symbolic link to py3wrapper
-_smake: autocomplete for zsh
-Makefile.tpl: template for Makefile to generate by smake.py
-SMakefile.tpl: template for SMakefile to generate a Makefile with annotations concerning samples
-py3wrapper: in order to use python3 on a python2 machine
+ * smake.py: main program
+ * smake: symbolic link to py3wrapper
+ * _smake: autocomplete for zsh
+ * Makefile.tpl: template for Makefile to generate by smake.py
+ * SMakefile.tpl: template for SMakefile to generate a Makefile with annotations concerning samples
+ * py3wrapper: in order to use python3 on a python2 machine
 
 ## vcfsetop
 ### Motivation
@@ -115,7 +115,7 @@ $ vcfsetop list input.vcf
 ```
 
 ### Depedencies
-vcfsetop.py: main program
-vcfsetop: symbolic link to py3wrapper
-vcfsetop: autocomplete for zsh
-py3wrapper: in order to use python3 on a python2 machine
+ * vcfsetop.py: main program
+ * vcfsetop: symbolic link to py3wrapper
+ * vcfsetop: autocomplete for zsh
+ * py3wrapper: in order to use python3 on a python2 machine
