@@ -29,7 +29,7 @@ In order to add new fastqs to the analysis, `scan` command is required.
 
 Example:
 ```bash
-$ smake.py scan --full FastqDirectory/ -o output.vcf
+$ smake.py scan --full FastqDirectory/ -o Makefile
 ```
 
 #### regenerate
@@ -64,7 +64,7 @@ Example:
 ```bash
 $ smake.py list Makefile
 ```
-### Depedencies
+### Dependencies
  * smake.py: main program
  * smake: symbolic link to py3wrapper
  * _smake: autocomplete for zsh
@@ -114,7 +114,7 @@ Example:
 $ vcfsetop list input.vcf
 ```
 
-### Depedencies
+### Dependencies
  * vcfsetop.py: main program
  * vcfsetop: symbolic link to py3wrapper
  * vcfsetop: autocomplete for zsh
