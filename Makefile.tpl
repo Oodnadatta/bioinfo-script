@@ -10,6 +10,7 @@ THREADS = 24
 MEMORY = 16g
 
 GATK = java -Xmx$(MEMORY) -jar ~/tools/GATK/GenomeAnalysisTK.jar
+SNPEFF = java -Xmx$(MEMORY) -jar ~/tools/snpEff/snpEff.jar
 
 THIS := $(abspath $(lastword $(MAKEFILE_LIST)))
 
@@ -110,7 +111,7 @@ all: output.vcf
 
 #Flag BAM duplicates with Picard
 %.duplicates.bam: %.sorted.bam
-	picard-tools MarkDuplicates REMOVE_DUPLICATES=false METRICS_FILE="$*.dup.log" I=$< O=$@
+	picard-tools MarkDuplicates REMOVE_DUPLICATES=false METRICS_FILE=$*.dup.log I=$< O=$@
 %.dup.log: %.duplicates.bam
 	touch $@
 
@@ -155,7 +156,7 @@ all: output.vcf
 		-T PrintReads \
 		-R ~/db/human_g1k_v37.fasta \
 		-I $< \
-		-BQSR "$*.bases" \
+		-BQSR $*.bases \
 		-o $@
 
 ############################  CALLING  ############################
@@ -234,7 +235,7 @@ output.raw.vcf: \
 			-an ReadPosRankSum \
 			-an SOR \
 		-recalFile $@ \
-		-tranchesFile "$*.raw.vcf.SNP.tranches"
+		-tranchesFile $*.raw.vcf.SNP.tranches
 %.raw.vcf.SNP.tranches: %.raw.vcf.SNP.recal
 	touch $@
 
@@ -247,8 +248,8 @@ output.raw.vcf: \
 		-R ~/db/human_g1k_v37.fasta \
 		-input $< \
 		--ts_filter_level 99.5 \
-		-recalFile "$*.raw.vcf.SNP.recal" \
-		-tranchesFile "$*.raw.vcf.SNP.tranches" \
+		-recalFile $*.raw.vcf.SNP.recal \
+		-tranchesFile $*.raw.vcf.SNP.tranches \
 		-o $@
 
 # Compute VQSR model for indels
@@ -268,7 +269,7 @@ output.raw.vcf: \
 			-an SOR \
 		--maxGaussians 4 \
 		-recalFile $@ \
-		-tranchesFile "$*.raw.vcf.indels.tranches"
+		-tranchesFile $*.raw.vcf.indels.tranches
 %.raw.vcf.indels.tranches: %.raw.vcf.indels.recal
 	touch $@
 
@@ -280,12 +281,12 @@ output.raw.vcf: \
 		-R ~/db/human_g1k_v37.fasta \
 		-input $< \
 		--ts_filter_level 99.0 \
-		-recalFile "$*.raw.vcf.indels.recal" \
-		-tranchesFile "$*.raw.vcf.indels.tranches" \
+		-recalFile $*.raw.vcf.indels.recal \
+		-tranchesFile $*.raw.vcf.indels.tranches \
 		-o $@
 
-# Filter variants on VQSR results
-%.vcf: %.all_recalibrated.vcf ~/db/human_g1k_v37.fasta
+# Select variants on VQSR results
+%.all_selected.vcf: %.all_recalibrated.vcf ~/db/human_g1k_v37.fasta
 	$(GATK) \
 		-nt $(THREADS) \
 		-T SelectVariants \
@@ -293,3 +294,16 @@ output.raw.vcf: \
 		-R ~/db/human_g1k_v37.fasta \
 		-V $< \
 		-o $@
+
+%.vcf: %.all_selected.vcf
+	$(SNPEFF) \
+		ann GRCh37.75 \
+		-i vcf \
+		-o vcf \
+		-sequenceOntology \
+		-lof \
+		-stats $*.snpeff.stats.html \
+		$< \
+		> $@
+%.snpeff.stats.html: %.vcf
+	touch $@
