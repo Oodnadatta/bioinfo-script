@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
-# (C) 2015 Anne-Sophie Denommé-Pichon <as.denomme@outlook.com>
-# (C) 2015 Jérémie Roquet <jroquet@arkanosis.net>
+# (C) 2015-2016 Anne-Sophie Denommé-Pichon <as.denomme@outlook.com>
+# (C) 2015-2016 Jérémie Roquet <jroquet@arkanosis.net>
 # Released under the MIT license
 
 import click
@@ -160,7 +160,7 @@ def cli():
 @click.option('--update', 'mode', flag_value=ScanMode.update, help='Perform a partial scan, updating existing Makefile.')
 @click.option('--ask', 'mode', flag_value=ScanMode.ask, default=True, help='Ask whether to perform a full scan or an update (default).')
 @click.argument('directory')
-@click.argument('makefile', default='.')
+@click.option('--output', '-o', 'makefile', default='.', help='Path to the Makefile to generate (default: in the scanned directory)')
 def scan(mode, directory, makefile):
     'Scan a DIRECTORY for FASTQ files and produce the MAKEFILE and its associated SMakefile.'
     directory = directory.rstrip(os.sep)
@@ -221,7 +221,7 @@ def scan(mode, directory, makefile):
 @cli.command()
 @click.argument('makefile')
 def list(makefile):
-    'List the targets the MAKEFILE\'s associated SMakefile.'
+    'List the targets of the MAKEFILE\'s associated SMakefile.'
     smakefile = smakefile_name(makefile)
     if not os.path.exists(smakefile):
         print('SMakefile not found for', makefile, file=sys.stderr)
