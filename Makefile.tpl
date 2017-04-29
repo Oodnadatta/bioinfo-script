@@ -173,7 +173,7 @@ for i in $(seq THREADS)
 	done
 #}
 #Call variants with GATK HaplotypeCaller in gVCF
-%.raw.gvcf: %.recalibrated.bam ~/db/Agilent/S04380110_Covered_noprefix.bed ~/db/human_g1k_v37.fasta ~/db/dbSNP/GRCh37p13_dbsnp146_00-All.vcf
+%.raw.gvcf: %.recalibrated.bam ~/db/Agilent/S04380110_Covered_noprefix.bed ~/db/human_g1k_v37.fasta ~/db/dbSNP/GRCh37p13_dbsnp146_00-All.vcf ~/db/human_g1k_v37.dict
 	$(GATK) \
 		-nct $(THREADS) \
 		-T HaplotypeCaller \
