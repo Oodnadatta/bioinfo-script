@@ -35,17 +35,18 @@ if __name__ == '__main__':
 				else:
 					if homozygous:
 						print(line)
-
+					
 			else: # pour les hétérozygotes composites
-				if compound_heterozygous:
-					split_string = 'EFF=' in line and 'EFF=' or 'ANN='
-					annotation = line.split('\t')[7].split(split_string)[1].split(';')[0]
-					for effect in annotation.split(','):
-						gene_name = effect.split('|')[3]
-						if gene_name:
-							if gene_name not in dico:
-								dico[gene_name] = set()
-							dico[gene_name].add(line)
+				if child_genotype[1] != '0':
+					if compound_heterozygous:
+						split_string = 'EFF=' in line and 'EFF=' or 'ANN='
+						annotation = line.split('\t')[7].split(split_string)[1].split(';')[0]
+						for effect in annotation.split(','):
+							gene_name = effect.split('|')[3]
+							if gene_name:
+								if gene_name not in dico:
+									dico[gene_name] = set()
+								dico[gene_name].add(line)
 
 	# annotation = ensemble des annotation des snpEFF uniquement
 	#	exemple :
