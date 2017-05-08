@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 
+import os
 import sys
 
 def find_genotype(variant, column):
@@ -20,7 +21,13 @@ if __name__ == '__main__':
 	xlinked = '-xlinked' in sys.argv
 	if xlinked:
 		sys.argv.remove('-xlinked')
-	
+
+	#Transforme les variables (booléens) en entiers pour savoir si l'utilisateur a utilisé plusieurs arguments	
+	if int(heterozygous) + int(homozygous) + int(compound_heterozygous) + int(xlinked) != 1 or len(sys.argv) > 1:
+		print('Usage: {} <-heterozygous|-homozygous|-compound-heterozygous|-xlinked>'.format(sys.argv[0].split(os.sep)[-1]),
+		      file=sys.stderr)
+		sys.exit(1)
+		
 	dico = {}
 	
 	for line in sys.stdin:
