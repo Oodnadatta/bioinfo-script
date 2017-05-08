@@ -7,6 +7,17 @@ def find_genotype(variant, column):
 	return variant.split('\t')[column].split(':')[0].split('/')
 
 if __name__ == '__main__':
+	
+	homozygous = '-homozygous' in sys.argv
+	if homozygous:
+		sys.argv.remove('-homozygous')
+	compound_heterozygous = '-compound-heterozygous' in sys.argv
+	if compound_heterozygous:
+		sys.argv.remove('-compound-heterozygous')
+	xlinked = '-xlinked' in sys.argv
+	if xlinked:
+		sys.argv.remove('-xlinked')
+	
 	dico = {}
 	
 	for line in sys.stdin:
@@ -17,17 +28,24 @@ if __name__ == '__main__':
 		else:
 			child_genotype = find_genotype(line, 9)
 			if child_genotype[0] != '0': # pour homozygotes
-				print(line)
+				if 'X' in line.split('\t', 1)[0]:
+					if xlinked:
+						print(line)
+					
+				else:
+					if homozygous:
+						print(line)
 
 			else: # pour les hétérozygotes composites
-				split_string = 'EFF=' in line and 'EFF=' or 'ANN='
-				annotation = line.split('\t')[7].split(split_string)[1].split(';')[0]
-				for effect in annotation.split(','):
-					gene_name = effect.split('|')[3]
-					if gene_name:
-						if gene_name not in dico:
-							dico[gene_name] = set()
-						dico[gene_name].add(line)
+				if compound_heterozygous:
+					split_string = 'EFF=' in line and 'EFF=' or 'ANN='
+					annotation = line.split('\t')[7].split(split_string)[1].split(';')[0]
+					for effect in annotation.split(','):
+						gene_name = effect.split('|')[3]
+						if gene_name:
+							if gene_name not in dico:
+								dico[gene_name] = set()
+							dico[gene_name].add(line)
 
 	# annotation = ensemble des annotation des snpEFF uniquement
 	#	exemple :
