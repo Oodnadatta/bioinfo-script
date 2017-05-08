@@ -8,6 +8,9 @@ def find_genotype(variant, column):
 
 if __name__ == '__main__':
 	
+	heterozygous = '-heterozygous' in sys.argv
+	if heterozygous:
+		sys.argv.remove('-heterozygous')
 	homozygous = '-homozygous' in sys.argv
 	if homozygous:
 		sys.argv.remove('-homozygous')
@@ -35,9 +38,12 @@ if __name__ == '__main__':
 				else:
 					if homozygous:
 						print(line)
-					
-			else: # pour les hétérozygotes composites
+			
+			else:
 				if child_genotype[1] != '0':
+					if heterozygous:
+						print(line)
+					
 					if compound_heterozygous:
 						split_string = 'EFF=' in line and 'EFF=' or 'ANN='
 						annotation = line.split('\t')[7].split(split_string)[1].split(';')[0]
