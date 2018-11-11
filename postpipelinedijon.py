@@ -57,14 +57,33 @@ with open(sys.argv[2], 'w', newline='') as outputtsvfile:
 				('.' == row[dictionnary['AC_gnomADge']] or
 				float(row[dictionnary['AC_gnomADge']]) <= threshold))
 		return has_count_in_gnomad_under_threshold
-
+	
+	def has_not_only_recessive_inheritance_in_OMIM(row):
+		for inheritance in row[dictionnary['OMIM_inheritance']].split('|'):
+			if inheritance != 'AR':
+				return True
+		return False
+	
+	def has_count_in_batch_under(threshold):
+		def has_count_in_batch_under_threshold(row):
+			return float(row[dictionnary['BatchSampleCount']]) <= threshold
+		return has_count_in_batch_under_threshold
+	
+	def has_count_in_control_under(threshold):
+		def has_count_in_control_under_threshold(row):
+			return float(row[dictionnary['ControlSampleCount']]) <= threshold
+		return has_count_in_control_under_threshold
+	
 	def is_candidate_for_dominant_inheritance(row):
 		return (
 			is_monoallelic(row) and
 			has_allele_balance_over(0.20)(row) and
 			is_in_OMIM(row) and
 			is_dominant(row) and
-			has_count_in_gnomad_under(5)(row))
+			has_count_in_gnomad_under(5)(row) and
+			has_not_only_recessive_inheritance_in_OMIM(row) and
+			has_count_in_batch_under(3)(row) and
+			has_count_in_control_under(2)(row))
 	
 	keep_if(is_candidate_for_dominant_inheritance)
 	
