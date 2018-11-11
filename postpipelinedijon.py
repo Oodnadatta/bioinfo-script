@@ -20,6 +20,7 @@ with open(sys.argv[2], 'w', newline='') as outputtsvfile:
 	tsvwriter = csv.writer(outputtsvfile, delimiter='\t')
 	tsvwriter.writerow(header)
 	for row in rows:
-		tsvwriter.writerow(row)
+		if 'pathogenic' in row[dictionnary['ClinVar']].lower() and 'conflicting_interpretations_of_pathogenicity' not in row[dictionnary['ClinVar']].lower():
+			tsvwriter.writerow(row)
 
 		
