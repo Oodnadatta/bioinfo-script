@@ -29,11 +29,11 @@ with open(sys.argv[2], 'w', newline='') as outputtsvfile:
 			del rows[rownumber]
 	def is_pathogenic_in_clinvar(row):
 		return 'pathogenic' in row[dictionnary['ClinVar']].lower() and 'conflicting_interpretations_of_pathogenicity' not in row[dictionnary['ClinVar']].lower()
-	# keep_if(is_pathogenic_in_clinvar)
+	keep_if(is_pathogenic_in_clinvar)
 	
 	def is_disease_mutation_in_HGMD(row):
 		return 'dm' in row[dictionnary['HGMD_Class']].lower()
-	# keep_if(is_disease_mutation_in_HGMD)
+	keep_if(is_disease_mutation_in_HGMD)
 	
 	def is_monoallelic(row):
 		return 'multiallelic' != row[dictionnary['Multiallelic']].lower()
@@ -82,9 +82,26 @@ with open(sys.argv[2], 'w', newline='') as outputtsvfile:
 			is_dominant(row) and
 			has_count_in_gnomad_under(5)(row) and
 			has_not_only_recessive_inheritance_in_OMIM(row) and
-			has_count_in_batch_under(3)(row) and
-			has_count_in_control_under(2)(row))
+			has_count_in_batch_under(2)(row) and
+			has_count_in_control_under(1)(row))
 	
 	keep_if(is_candidate_for_dominant_inheritance)
 	
+	def has_not_only_dominant_inheritance_in_OMIM(row):
+		for inheritance in row[dictionnary['OMIM_inheritance']].split('|'):
+			if inheritance != 'AD':
+				return True
+		return False
+	
+	def is_candidate_for_recessive_inheritance(row):
+		return (
+			is_monoallelic(row) and
+			has_allele_balance_over(0.20)(row) and
+			is_in_OMIM(row) and
+			not is_dominant(row) and
+			has_not_only_dominant_inheritance_in_OMIM(row) and
+			has_count_in_batch_under(3)(row) and
+			has_count_in_control_under(2)(row))
+	
+	keep_if(is_candidate_for_recessive_inheritance)
 		
