@@ -1,6 +1,9 @@
 #! /usr/bin/env python3
 
+import glob
 import sys
+
 import postpipelinedijon
 
-# python "C:\Users\asden\Desktop\a jeter\bioinfo-script\postpipelinedijon.py" "C:\Users\asden\Desktop\Exomes Dijon\*.report.tsv" "C:\Users\asden\Desktop\Exomes Dijon\*.report.filtered.tsv"
+for inputtsvfilename in glob.glob(r'C:\Users\asden\Desktop\Exomes Dijon\*.report.tsv'):
+	postpipelinedijon.filter_variants(inputtsvfilename, inputtsvfilename.replace('report.tsv', 'report.filtered.tsv'))

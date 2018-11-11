@@ -38,7 +38,7 @@ def filter_variants(inputtsvfilename, outputtsvfilename):
 		
 		def has_allele_balance_over(threshold):
 			def has_allele_balance_over_threshold(row):
-				return float(row[4].split('=')[-1]) >= threshold
+				return float(row[4].strip('"').split('=')[-1]) >= threshold
 			return has_allele_balance_over_threshold
 		
 		def is_in_OMIM(row):
