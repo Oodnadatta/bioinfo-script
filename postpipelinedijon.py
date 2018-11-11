@@ -40,7 +40,7 @@ with open(sys.argv[2], 'w', newline='') as outputtsvfile:
 	
 	def has_allele_balance_over(threshold):
 		def has_allele_balance_over_threshold(row):
-			return float(row[dictionnary['dijex2934']].split('=')[-1]) >= threshold
+			return float(row[4].split('=')[-1]) >= threshold
 		return has_allele_balance_over_threshold
 	
 	def is_in_OMIM(row):
