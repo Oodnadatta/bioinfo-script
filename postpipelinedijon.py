@@ -25,9 +25,17 @@ with open(sys.argv[2], 'w', newline='') as outputtsvfile:
 			if condition(row):
 				tsvwriter.writerow(row)
 				todelete.append(rownumber)
-		for rownumber in todelete:
+		for rownumber in todelete[::-1]:
 			del rows[rownumber]
 	def is_pathogenic_in_clinvar(row):
 		return 'pathogenic' in row[dictionnary['ClinVar']].lower() and 'conflicting_interpretations_of_pathogenicity' not in row[dictionnary['ClinVar']].lower()
 	keep_if(is_pathogenic_in_clinvar)
+	
+	def is_disease_mutation_in_HGMD(row):
+		return 'dm' in row[dictionnary['HGMD_Class']].lower()
+	keep_if(is_disease_mutation_in_HGMD)
+	
+	def is_monoallelic(row):
+		return 'multiallelic' != row[dictionnary['Multiallelic']].lower()
+	keep_if(is_monoallelic)
 	
