@@ -29,13 +29,24 @@ with open(sys.argv[2], 'w', newline='') as outputtsvfile:
 			del rows[rownumber]
 	def is_pathogenic_in_clinvar(row):
 		return 'pathogenic' in row[dictionnary['ClinVar']].lower() and 'conflicting_interpretations_of_pathogenicity' not in row[dictionnary['ClinVar']].lower()
-	keep_if(is_pathogenic_in_clinvar)
+	# keep_if(is_pathogenic_in_clinvar)
 	
 	def is_disease_mutation_in_HGMD(row):
 		return 'dm' in row[dictionnary['HGMD_Class']].lower()
-	keep_if(is_disease_mutation_in_HGMD)
+	# keep_if(is_disease_mutation_in_HGMD)
 	
 	def is_monoallelic(row):
 		return 'multiallelic' != row[dictionnary['Multiallelic']].lower()
-	keep_if(is_monoallelic)
 	
+	def is_in_OMIM(row):
+		return '.' != row[dictionnary['OMIM']]
+	
+	def has_allele_balance_over_0_20(row):
+		return float(row[dictionnary['dijex2934']].split('=')[-1]) >= 0.20
+	
+	def is_monoallelic_and_has_allele_balance_over_0_20(row):
+		return is_monoallelic(row) and has_allele_balance_over_0_20(row)
+		
+	keep_if(is_monoallelic_and_has_allele_balance_over_0_20)
+	
+		
