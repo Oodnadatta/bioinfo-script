@@ -38,15 +38,34 @@ with open(sys.argv[2], 'w', newline='') as outputtsvfile:
 	def is_monoallelic(row):
 		return 'multiallelic' != row[dictionnary['Multiallelic']].lower()
 	
+	def has_allele_balance_over(threshold):
+		def has_allele_balance_over_threshold(row):
+			return float(row[dictionnary['dijex2934']].split('=')[-1]) >= threshold
+		return has_allele_balance_over_threshold
+	
 	def is_in_OMIM(row):
 		return '.' != row[dictionnary['OMIM']]
 	
-	def has_allele_balance_over_0_20(row):
-		return float(row[dictionnary['dijex2934']].split('=')[-1]) >= 0.20
+	def is_dominant(row):
+		return 'no' == row[dictionnary['Recessive']].lower()
 	
-	def is_monoallelic_and_has_allele_balance_over_0_20(row):
-		return is_monoallelic(row) and has_allele_balance_over_0_20(row)
-		
-	keep_if(is_monoallelic_and_has_allele_balance_over_0_20)
+	def has_count_in_gnomad_under(threshold):
+		def has_count_in_gnomad_under_threshold(row):
+			return (
+				('.' == row[dictionnary['AC_gnomADex']] or
+				float(row[dictionnary['AC_gnomADex']]) <= threshold) and
+				('.' == row[dictionnary['AC_gnomADge']] or
+				float(row[dictionnary['AC_gnomADge']]) <= threshold))
+		return has_count_in_gnomad_under_threshold
+
+	def is_candidate_for_dominant_inheritance(row):
+		return (
+			is_monoallelic(row) and
+			has_allele_balance_over(0.20)(row) and
+			is_in_OMIM(row) and
+			is_dominant(row) and
+			has_count_in_gnomad_under(5)(row))
+	
+	keep_if(is_candidate_for_dominant_inheritance)
 	
 		
