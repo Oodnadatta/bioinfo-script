@@ -8,11 +8,14 @@ if len(sys.argv) != 2:
 	sys.exit(1)
 with open(sys.argv[1], 'r') as tsvfile:
 	tsvreader = csv.reader(tsvfile, delimiter='\t', quoting=csv.QUOTE_NONE)
-	#TODO : gérer les fichiers vides
+	#TODO: support empty files
 	header = next(tsvreader)
 	print(header)
+	#TODO: reprint header to be in tsv and not in csv
 	dictionnary = {columnname:columnnumber for columnnumber, columnname in enumerate(header)}
-	print (dictionnary)
-	#for row in tsvreader:
-	#	print(row)
+	rows = []
+	for row in tsvreader:
+		rows.append(row)
+
+
 		
