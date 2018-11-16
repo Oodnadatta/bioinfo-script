@@ -82,7 +82,6 @@ def filter_variants(inputtsvfilename, outputtsvfilename):
 				has_not_only_recessive_inheritance_in_OMIM(row) and
 				has_count_in_batch_under(2)(row) and
 				has_count_in_control_under(1)(row))
-		
 		keep_if(is_candidate_for_dominant_inheritance)
 		
 		def has_not_only_dominant_inheritance_in_OMIM(row):
@@ -100,8 +99,11 @@ def filter_variants(inputtsvfilename, outputtsvfilename):
 				has_not_only_dominant_inheritance_in_OMIM(row) and
 				has_count_in_batch_under(3)(row) and
 				has_count_in_control_under(2)(row))
-		
 		keep_if(is_candidate_for_recessive_inheritance)
+		
+		def has_CNV(row):
+			return '.' != row[dictionnary['CNVs']]
+		keep_if(has_CNV)
 		
 if __name__ == '__main__':
 	if len(sys.argv) != 3:
