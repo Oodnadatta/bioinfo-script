@@ -105,6 +105,25 @@ def filter_variants(inputtsvfilename, outputtsvfilename):
 			return '.' != row[dictionnary['CNVs']]
 		keep_if(has_CNV)
 		
+		def is_truncating(row):
+			return 'false' == row[dictionnary['Truncating']].lower()		
+
+		def has_PLI_over(threshold):
+			def has_PLI_over_threshold(row):
+				return float(row[dictionnary['PLI']]) >= threshold
+			return has_PLI_over_threshold
+		
+		def is_untolerated_truncated_and_not_in_OMIM(row):
+			return (
+				is_monoallelic(row) and
+				has_allele_balance_over(0.20)(row) and
+				has_PLI_over(0.9)(row) and
+				is_truncating and	
+				not is_in_OMIM(row) and
+				has_count_in_batch_under(3)(row) and
+				has_count_in_control_under(2)(row))
+		keep_if(is_untolerated_truncated_and_not_in_OMIM)	
+		
 if __name__ == '__main__':
 	if len(sys.argv) != 3:
 		print('Usage: postpipelinedijon.py inputfilename.tsv outputfilename.tsv', file=sys.stderr)
