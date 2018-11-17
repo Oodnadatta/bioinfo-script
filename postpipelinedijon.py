@@ -17,7 +17,8 @@ def filter_variants(inputtsvfilename, outputtsvfilename):
 	with open(outputtsvfilename, 'w', newline='') as outputtsvfile:
 		tsvwriter = csv.writer(outputtsvfile, delimiter='\t')
 		tsvwriter.writerow(header)
-		def keep_if(condition):
+		def keep_if(condition, title):
+			tsvwriter.writerow(['#' + title])
 			todelete = []
 			for rownumber, row in enumerate(rows):
 				if condition(row):
@@ -27,11 +28,9 @@ def filter_variants(inputtsvfilename, outputtsvfilename):
 				del rows[rownumber]
 		def is_pathogenic_in_clinvar(row):
 			return 'pathogenic' in row[dictionnary['ClinVar']].lower() and 'conflicting_interpretations_of_pathogenicity' not in row[dictionnary['ClinVar']].lower()
-		keep_if(is_pathogenic_in_clinvar)
 		
 		def is_disease_mutation_in_HGMD(row):
 			return 'dm' in row[dictionnary['HGMD_Class']].lower()
-		keep_if(is_disease_mutation_in_HGMD)
 		
 		def is_monoallelic(row):
 			return 'multiallelic' != row[dictionnary['Multiallelic']].lower()
@@ -82,7 +81,6 @@ def filter_variants(inputtsvfilename, outputtsvfilename):
 				has_not_only_recessive_inheritance_in_OMIM(row) and
 				has_count_in_batch_under(2)(row) and
 				has_count_in_control_under(1)(row))
-		keep_if(is_candidate_for_dominant_inheritance)
 		
 		def has_not_only_dominant_inheritance_in_OMIM(row):
 			for inheritance in row[dictionnary['OMIM_inheritance']].split('|'):
@@ -99,30 +97,43 @@ def filter_variants(inputtsvfilename, outputtsvfilename):
 				has_not_only_dominant_inheritance_in_OMIM(row) and
 				has_count_in_batch_under(3)(row) and
 				has_count_in_control_under(2)(row))
-		keep_if(is_candidate_for_recessive_inheritance)
-		
-		def has_CNV(row):
-			return '.' != row[dictionnary['CNVs']]
-		keep_if(has_CNV)
 		
 		def is_truncating(row):
-			return 'false' == row[dictionnary['Truncating']].lower()		
-
+			return 'true' == row[dictionnary['Truncating']].lower()		
+		
+		def has_not_only_dominant_inheritance_in_OMIM(row):
+			for inheritance in row[dictionnary['OMIM_inheritance']].split('|'):
+				if inheritance != 'AD':
+					return True
+			return False
+		
 		def has_PLI_over(threshold):
 			def has_PLI_over_threshold(row):
-				return float(row[dictionnary['PLI']]) >= threshold
+				for intolerance in row[dictionnary['PLI']].split(','):
+					if intolerance != '.' and float(intolerance) >= threshold:
+						return True
+				return False
 			return has_PLI_over_threshold
 		
-		def is_untolerated_truncated_and_not_in_OMIM(row):
+		def is_intolerated_truncated_and_not_in_OMIM(row):
 			return (
 				is_monoallelic(row) and
 				has_allele_balance_over(0.20)(row) and
 				has_PLI_over(0.9)(row) and
-				is_truncating and	
+				is_truncating(row) and	
 				not is_in_OMIM(row) and
 				has_count_in_batch_under(3)(row) and
 				has_count_in_control_under(2)(row))
-		keep_if(is_untolerated_truncated_and_not_in_OMIM)	
+		
+		def has_CNV(row):
+			return '.' != row[dictionnary['CNVs']]
+		
+		keep_if(is_pathogenic_in_clinvar, 'Pathogenic or likely pathogenic in ClinVar')
+		keep_if(is_disease_mutation_in_HGMD, '"Disease mutation" (or suspected as) in HGMD')
+		keep_if(is_candidate_for_dominant_inheritance, 'Dominant')
+		keep_if(is_candidate_for_recessive_inheritance, 'Recessive')
+		keep_if(is_intolerated_truncated_and_not_in_OMIM, 'Intolerant truncated the gene of which is not in OMIM')
+		keep_if(has_CNV, 'CNV in the same gene')
 		
 if __name__ == '__main__':
 	if len(sys.argv) != 3:
