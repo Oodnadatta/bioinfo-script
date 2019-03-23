@@ -76,7 +76,6 @@ def filter_variants(inputtsvfilename, outputtsvfilename):
 				is_monoallelic(row) and
 				has_allele_balance_over(0.20)(row) and
 				is_in_OMIM(row) and
-				is_dominant(row) and
 				has_count_in_gnomad_under(5)(row) and
 				has_not_only_recessive_inheritance_in_OMIM(row) and
 				has_count_in_batch_under(2)(row) and
@@ -130,8 +129,8 @@ def filter_variants(inputtsvfilename, outputtsvfilename):
 		
 		keep_if(is_pathogenic_in_clinvar, 'Pathogenic or likely pathogenic in ClinVar')
 		keep_if(is_disease_mutation_in_HGMD, '"Disease mutation" (or suspected as) in HGMD')
-		keep_if(is_candidate_for_dominant_inheritance, 'Dominant')
 		keep_if(is_candidate_for_recessive_inheritance, 'Recessive')
+		keep_if(is_candidate_for_dominant_inheritance, 'Dominant')
 		keep_if(is_intolerated_truncated_and_not_in_OMIM, 'Intolerant truncated the gene of which is not in OMIM')
 		keep_if(has_CNV, 'CNV in the same gene')
 		
