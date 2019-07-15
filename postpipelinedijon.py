@@ -3,11 +3,17 @@
 import csv
 import sys
 
+class EmptyFileException(Exception):
+	pass
+
 def filter_variants(inputtsvfilename, outputtsvfilename):
 	with open(inputtsvfilename, 'r', newline='') as inputtsvfile:
 		tsvreader = csv.reader(inputtsvfile, delimiter='\t', quoting=csv.QUOTE_NONE)
-		#TODO: support empty files
-		header = next(tsvreader)
+		try:
+			header = next(tsvreader)
+		except StopIteration as ex:
+			print('File "' + inputtsvfilename + '" is empty.', file=sys.stderr)
+			raise EmptyFileException() from ex
 		#TODO: reprint header to be in tsv and not in csv
 		dictionnary = {columnname:columnnumber for columnnumber, columnname in enumerate(header)}
 		rows = []
@@ -138,4 +144,7 @@ if __name__ == '__main__':
 	if len(sys.argv) != 3:
 		print('Usage: postpipelinedijon.py inputfilename.tsv outputfilename.tsv', file=sys.stderr)
 		sys.exit(1)
-	filter_variants(sys.argv[1], sys.argv[2])
+	try:
+		filter_variants(sys.argv[1], sys.argv[2])
+	except EmptyFileException as ex:
+		sys.exit(1)
