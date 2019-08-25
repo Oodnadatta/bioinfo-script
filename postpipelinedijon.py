@@ -82,7 +82,7 @@ def filter_variants(inputtsvfilename, outputtsvfilename):
 				is_monoallelic(row) and
 				has_allele_balance_over(0.20)(row) and
 				is_in_OMIM(row) and
-				has_count_in_gnomad_under(5)(row) and
+				has_count_in_gnomad_under(10)(row) and
 				has_not_only_recessive_inheritance_in_OMIM(row) and
 				has_count_in_batch_under(2)(row) and
 				has_count_in_control_under(1)(row))
