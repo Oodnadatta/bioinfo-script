@@ -5,28 +5,30 @@
 # Script to get SNPs genotype by pedigree from LabKey export in xlsx
 
 import openpyxl
+import os.path
+import sys
 
-if __name__ == '__main__':
-    input_wb = openpyxl.load_workbook(r"C:\Users\asden\Desktop\Genotypage sample_2020-01-04_21-36-01.xlsx") #FIXME : make name of file generic
+#{
+#    'PED7699.1': {
+#        '18069': {
+#            '2010-01-02': {
+#                'SNP10_rs9530': 'A/G',
+#                'SNP11_rs20583': 'C/T'
+#            }
+#        }
+#    }
+#}
+
+# Create an object (json like) to store the values extracted from the xlsx.
+def load_genotypes_from_xlsx(input_path, ped_number):
+    input_wb = openpyxl.load_workbook(input_path)
     ws = input_wb['data']
-
-    # Create an object (json like) to store the values extracted from the xlsx.
-    #{
-    #    'PED7699.1': {
-    #        '18069': {
-    #            '2010-01-02': {
-    #                'SNP10_rs9530': 'A/G',
-    #                'SNP11_rs20583': 'C/T'
-    #            }
-    #        }
-    #    }
-    #}
 
     values = {}
     snps = set()
 
     for row in ws.rows:
-        if row[0].value.startswith('PED7699'): #FIXME : make name of PED generic
+        if row[0].value.startswith(ped_number):
             snps.add(row[3].value)
             ped = values.setdefault(row[0].value, {})
             gad = ped.setdefault(str(row[14].value), {}) #FIXME : remove float type to GAD
@@ -34,8 +36,10 @@ if __name__ == '__main__':
             ## Genotype
             date[row[3].value] = row[9].value
     snps_names = sorted(snps)
- 
-    # Create an xslx file to sumarize genotypes by PED number.
+    return values, snps_names
+    
+# Create an xlsx file to sumarize genotypes by PED number.
+def save_genotypes_to_xlsx(values, snps_names, ped_number):
     output_wb = openpyxl.Workbook()
     ws = output_wb.active
 
@@ -61,4 +65,13 @@ if __name__ == '__main__':
     for column in range(ord('B'), ord('Z')):
         ws.column_dimensions[chr(column)].width = 10
     
-    output_wb.save(r"C:\Users\asden\Desktop\PED7699.xlsx")
+    output_wb.save(os.path.join(r"C:\Users\asden\Desktop", ped_number + ".xlsx"))
+    
+if __name__ == '__main__':
+    if len(sys.argv) != 3:
+        print(f'Usage: {sys.argv[0].split(os.sep)[-1]} PED_number input_file.xlsx')
+        sys.exit(1)
+    
+    values, snps_names = load_genotypes_from_xlsx(sys.argv[2], sys.argv[1])
+    save_genotypes_to_xlsx(values, snps_names, sys.argv[1])
+    
