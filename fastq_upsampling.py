@@ -37,9 +37,7 @@ def upsample(upsampling_read_count, read_id):
             if x > max_x:
                 max_x = x
 
-            y = int(title_line.split(':')[5])
-            if y > max_y:
-                max_y = y
+            y = str(title_line.split(':')[5])
 
             if title_line == read_id:
                 title_line_str = title_line
@@ -51,7 +49,7 @@ def upsample(upsampling_read_count, read_id):
         pass
     
     for i in range(1, upsampling_read_count + 1):
-        print(':'.join(title_line_str.split(':')[0:2] + [str(max_lane + i), str(max_tile + i), str(max_x + i), str(max_y + i)]))
+        print(':'.join(title_line_str.split(':')[0:2] + [str(max_lane + i), str(max_tile + i), str(max_x + i), str(y)]))
         print(sequence_line_str)
         print('+')
         print(quality_line_str)
